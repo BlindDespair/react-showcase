@@ -17,11 +17,17 @@ import { getClosestFutureDate } from "~/utils/get-closest-date";
 
 declare global {
   interface Window {
-    unsafeAddCampaigns: (campaigns: unknown) => void;
+    AddCampaigns: (campaigns: unknown) => void;
   }
 }
 
-type NewCampaign = Omit<Campaign, "id" | "isActive">;
+type NewCampaign = Omit<
+  Campaign,
+  "id" | "isActive" | "startDate" | "endDate"
+> & {
+  readonly startDate: string | Date | number;
+  readonly endDate: string | Date | number;
+};
 
 /**
  * Simulating auto-increment feature of a database
@@ -85,14 +91,53 @@ class CampaignService {
     )
   );
 
+  private _convertNewCampaignToCampaign(
+    id: Campaign["id"],
+    campaign: NewCampaign
+  ): Campaign {
+    const startDate = new Date(campaign.startDate);
+    const endDate = new Date(campaign.endDate);
+
+    if (!isFinite(campaign.budget) || campaign.budget < 0) {
+      throw new Error("Budget should be a positive number");
+    }
+
+    if (!isFinite(startDate.valueOf())) {
+      throw new Error("Start date should be a valid date");
+    }
+
+    if (!isFinite(endDate.valueOf())) {
+      throw new Error("End date should be a valid date");
+    }
+
+    if (endDate.valueOf() < startDate.valueOf()) {
+      throw new Error("End date should be after the start date");
+    }
+
+    return {
+      ...campaign,
+      id,
+      startDate,
+      endDate,
+      isActive: isBetween(new Date(), startDate, endDate),
+    };
+  }
+
   public addCampaigns(newCampaigns: readonly NewCampaign[]): void {
     let campaigns = this._campaigns$.getValue();
-    newCampaigns.forEach((campaign) => {
-      campaigns = campaigns.concat({
-        ...campaign,
-        id: idCounter++,
-        isActive: isBetween(new Date(), campaign.startDate, campaign.endDate),
-      });
+    newCampaigns.forEach((campaign, index) => {
+      const id = idCounter++;
+
+      try {
+        campaigns = campaigns.concat(
+          this._convertNewCampaignToCampaign(id, campaign)
+        );
+      } catch (e) {
+        console.warn(
+          `Skipping new campaign with index ${index} due to a validation error`,
+          e
+        );
+      }
     });
     this._campaigns$.next(campaigns);
   }
@@ -101,8 +146,8 @@ class CampaignService {
 export const campaignService = new CampaignService();
 
 if (typeof window !== "undefined") {
-  window.unsafeAddCampaigns = (campaigns: unknown) => {
-    const isValidNewCampaign = (campaign: unknown): campaign is NewCampaign => {
+  window.AddCampaigns = (campaigns: unknown) => {
+    const isNewCampaign = (campaign: unknown): campaign is NewCampaign => {
       return (
         isRecordWithProperties(campaign, [
           "name",
@@ -112,21 +157,21 @@ if (typeof window !== "undefined") {
         ] as const) &&
         typeof campaign.name === "string" &&
         typeof campaign.budget === "number" &&
-        isFinite(campaign.budget) &&
-        campaign.budget > 0 &&
-        campaign.startDate instanceof Date &&
-        isFinite(campaign.startDate.valueOf()) &&
-        campaign.endDate instanceof Date &&
-        isFinite(campaign.endDate.valueOf()) &&
-        campaign.endDate > campaign.startDate
+        (campaign.startDate instanceof Date ||
+          typeof campaign.startDate === "string" ||
+          typeof campaign.startDate === "number") &&
+        (campaign.endDate instanceof Date ||
+          typeof campaign.endDate === "string" ||
+          typeof campaign.endDate === "number")
       );
     };
+
     Object.defineProperty(window, "unsafeAddCampaigns", {
       configurable: false,
       writable: false,
     });
 
-    if (Array.isArray(campaigns) && campaigns.every(isValidNewCampaign)) {
+    if (Array.isArray(campaigns) && campaigns.every(isNewCampaign)) {
       campaignService.addCampaigns(campaigns);
     } else {
       throw new Error(
