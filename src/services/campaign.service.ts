@@ -175,7 +175,7 @@ if (typeof window !== "undefined") {
       campaignService.addCampaigns(campaigns);
     } else {
       throw new Error(
-        "Invalid data is provided. Campaigns must match this signature: {name: string; budget: number; startDate: Date; endDate: Date}[]"
+        "Invalid data is provided. Campaigns must match this signature: {name: string; budget: number; startDate: string | number | Date; endDate: string | number | Date}[]"
       );
     }
   };
