@@ -21,7 +21,7 @@ declare global {
   }
 }
 
-type NewCampaign = Omit<Campaign, "id">;
+type NewCampaign = Omit<Campaign, "id" | "isActive">;
 
 /**
  * Simulating auto-increment feature of a database
@@ -88,7 +88,11 @@ class CampaignService {
   public addCampaigns(newCampaigns: readonly NewCampaign[]): void {
     let campaigns = this._campaigns$.getValue();
     newCampaigns.forEach((campaign) => {
-      campaigns = campaigns.concat({ ...campaign, id: idCounter++ });
+      campaigns = campaigns.concat({
+        ...campaign,
+        id: idCounter++,
+        isActive: isBetween(new Date(), campaign.startDate, campaign.endDate),
+      });
     });
     this._campaigns$.next(campaigns);
   }
