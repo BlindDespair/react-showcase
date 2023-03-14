@@ -38,10 +38,10 @@ function generateCampaigns(amount = 500): readonly Campaign[] {
   const campaigns: Campaign[] = [];
   for (let i = 0; i <= amount; i++) {
     const startDate = randomDate(
-      new Date("01-01-2022"),
-      new Date("01-01-2024")
+      new Date("2022-01-01"),
+      new Date("2024-01-01")
     );
-    const endDate = randomDate(startDate, new Date("01-01-2025"));
+    const endDate = randomDate(startDate, new Date("2025-01-01"));
     campaigns.push({
       id: idCounter,
       budget: randomInt(10, 999),
